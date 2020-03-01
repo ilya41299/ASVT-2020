@@ -1,288 +1,396 @@
 #include <iostream>
 #include <vector>
-#include <bitset>
-#include <unordered_set>
+#include <map>
 #include <set>
-#include <fstream>
+#include <string>
 #include <algorithm>
+#include <fstream>
+#include <iomanip>
 
-struct K
+class MyClass
 {
-	std::vector<int>  K_index;
-	std::string K_bool;
-	bool is_active;
-	int deg;
-	K();
-	K(std::vector<int> index, std::string boolean)
-	{
-		K_index = index;
-		K_bool = boolean;
-		is_active = true;
-		int count = 0;
-		for (size_t i = 0; i < index.size(); i++)
-		{
-			if (index[i] == 1) count++;
-		}
-		deg = count;
-	}
-	bool operator==(const K& rhs)
-	{
-		for (size_t i = 0; i < K_index.size(); i++)
-		{
-			if (rhs.K_index[i] != K_index[i]) return false;
-			if (K_index[i] == 1) 
-			{
-				if (K_bool[i] != rhs.K_bool[i]) return false;
-			}
-		}
-		return true;;
-	}
+public:
+	MyClass(int n, std::vector<std::string> DNF);
+	void finding_implicant(); // поиск имликант 
+	void print(std::ofstream &fout); // печать таблицы
+	void alignment_marks(std::ofstream &fout); // расстановка меток и их минимизация
+private:
+	std::vector<std::string> start_minterms; // наборы ДНФ
+	std::set<std::string> result_implicants; // импликанты получаемые при склейке 
+	std::map<int, std::vector<std::string>> numbers_group; // вектора сгруппированные по весу. i = вес
+	int N; // размерность 
+	int weight(std::string &V); // весовая функция набора
+	bool splice(); // получение конечных склеек
+	bool is_splice(std::string &S1, std::string &S2); // проверка возможности склейки
+	std::string make_splice(std::string &S1, std::string &S2); // склейка двух наборов
+	bool is_absorb(std::string S1, std::string S2); // проверка на возможностть склейки
+	void print_res(std::ofstream& fout, bool** matrix);
+	
 };
 
 
-
-void initialisation_function_numers(std::vector<std::string> &function_numers)
+MyClass::MyClass(int n, std::vector<std::string> DNF)
 {
-	for (size_t i = 0; i < 64; i++)
+	N = n;
+	for (size_t i = 0; i < DNF.size(); i++)
 	{
-		std::bitset<6> V = i;
-		std::string number;
-		for (size_t j = V.size(); j > 0; j--)
-		{
-			if (V[j-1]) number.push_back('1');
-			else number.push_back('0');
-		}
-		function_numers.push_back(number);
+		numbers_group[weight(DNF[i])].push_back(DNF[i]);
 	}
+	start_minterms = DNF;
 }
 
-void initialisation_string_coefficients(std::vector<std::vector<K>>& string_coefficients, std::vector<std::string>& function_numers)
+void MyClass::finding_implicant()
 {
-	for (int counter = 0; counter < 64; counter++)
+	while (splice())
 	{
-		std::vector<K> V_K;
-		for (size_t i = 0; i < 2; i++)
-		{
-			for (size_t j = 0; j < 2; j++)
-			{
-				for (size_t k = 0; k < 2; k++)
-				{
-					for (size_t l = 0; l < 2; l++)
-					{
-						for (size_t m = 0; m < 2; m++)
-						{
-							for (size_t n = 0; n < 2; n++)
-							{
-								if (i == 0 && j == 0 && k == 0 && l == 0 && m == 0 && n == 0)continue;
-								std::vector<int> V;
-								V.push_back(i);
-								V.push_back(j);
-								V.push_back(k);
-								V.push_back(l);
-								V.push_back(m);
-								V.push_back(n);
-								K coef(V, function_numers[counter]);
-								V_K.push_back(coef);
-								
-							}
-						}
-					}
-				}
-			}
-		}
-		string_coefficients.push_back(V_K);
+
 	}
+	std::set<std::string> implicants;
+	for (size_t i = 0; i < numbers_group.size(); i++)
+	{
+		for (size_t j = 0; j < numbers_group[i].size(); j++)
+		{
+			implicants.insert(numbers_group[i][j]);
+		}
+	}
+	result_implicants = implicants;
 }
 
-void find_delete_K(std::vector<std::vector<K>>& string_coefficients, std::vector<std::string>& function_numbers, std::unordered_set<std::string>& is_true_in_DNF)
+void MyClass::print(std::ofstream &fout)
 {
-	std::vector<K> zeros_K;
-	// ищем и запоминаем нулевые коэффициенты
-	for (size_t i = 0; i < string_coefficients.size(); i++)
+	fout << '+';
+	for (auto i = 0; i < start_minterms.size() + 1; i++)
 	{
-		if (is_true_in_DNF.find(function_numbers[i]) != is_true_in_DNF.end()) continue;
+		for (size_t j = 0; j < N; j++)
+		{
+			fout << '-';
+		}
+		fout << '+';
+	}
+	fout << std::endl;
+	fout << '|';
+	for (auto i = 0; i < start_minterms.size() + 1; i++)
+	{
+		if (i == 0)
+		{
+			fout << std::setw(N) << ' ' << '|';
+		}
 		else 
 		{
-			for (size_t j = 0; j < string_coefficients[i].size(); j++)
+			fout << std::setw(N) << start_minterms[i - 1] << '|';
+		}
+	}
+	fout << std::endl;
+	fout << '+';
+	for (auto i = 0; i < start_minterms.size() + 1; i++)
+	{
+		for (size_t j = 0; j < N; j++)
+		{
+			fout << '-';
+		}
+		fout << '+';
+	}
+	fout << std::endl;
+	for (auto& el : result_implicants) 
+	{
+		fout << '|';
+		fout << std::setw(N) << el << '|';
+		for (auto j = 0; j < start_minterms.size(); j++) {
+			if (is_absorb(el, start_minterms[j]))
 			{
-				zeros_K.push_back(string_coefficients[i][j]);
+				fout << std::setw(N) << is_absorb(el, start_minterms[j]) << '|';
+			}
+			else fout << std::setw(N) << ' ' << '|';
+			
+		}
+		fout << std::endl;
+		fout << '+';
+		for (auto i = 0; i < start_minterms.size() + 1; i++)
+		{
+			for (size_t j = 0; j < N; j++)
+			{
+				fout << '-';
+			}
+			fout << '+';
+		}
+		fout << std::endl;
+	}
+}
+
+int MyClass::weight(std::string &V)
+{
+	int weight_V = 0;
+	for (size_t i = 0; i < V.size(); i++)
+	{
+		if (V[i] == '1') weight_V++;
+	}
+	return weight_V;
+}
+
+bool MyClass::splice()
+{
+	std::vector<std::string> splices;
+	std::set<std::string> numbers_for_delete;
+	std::string splice_string;
+	bool can_splices = false;
+	for (size_t index_weight = 0; index_weight < N; index_weight++)
+	{
+		for (size_t i = 0; i < numbers_group[index_weight].size(); i++)
+		{
+			for (size_t j = 0; j < numbers_group[index_weight+1].size(); j++)
+			{
+				if (is_splice(numbers_group[index_weight][i], numbers_group[index_weight + 1][j]))
+				{
+					splice_string = make_splice(numbers_group[index_weight][i], numbers_group[index_weight + 1][j]);
+					splices.push_back(splice_string);
+					numbers_for_delete.insert(numbers_group[index_weight][i]);
+					numbers_for_delete.insert(numbers_group[index_weight + 1][j]);
+					can_splices = true;
+				}
 			}
 		}
 	}
-
-	// удаляем коэффициенты
-	for (size_t i = 0; i < string_coefficients.size(); i++)
+	for (size_t i = 0; i < splices.size(); i++)
 	{
-		for (size_t j = 0; j < string_coefficients[i].size(); j++)
-		{
-			if (std::find(zeros_K.begin(), zeros_K.end(), string_coefficients[i][j]) != zeros_K.end())
-			{
-				string_coefficients[i][j].is_active = false;
-			}
-
-		}
+		numbers_group[weight(splices[i])].push_back(splices[i]);
 	}
+	for(auto el : numbers_for_delete)
+	{
+		int weight_el = weight(el);
+		numbers_group[weight_el].erase(std::find(numbers_group[weight_el].begin(), numbers_group[weight_el].end(), el));
+	}
+	return can_splices;
 }
 
-// проверка, есть ли еще непокрытые уравнения
-bool not_yet(std::vector<std::vector<K>>& string_coefficients)
+bool MyClass::is_splice(std::string &S1, std::string &S2)
 {
-	for (size_t i = 0; i < string_coefficients.size(); i++)
+	int count_difference = 0;
+	for (size_t i = 0; i < N; i++)
 	{
-		for (size_t j = 0; j < string_coefficients[i].size(); j++)
-		{
-			if (string_coefficients[i][j].is_active) return true;
-		}
+		if (S1[i] == S2[i]) continue;
+		else count_difference++;
+		if (count_difference > 1) return false;
 	}
-	return false;
+	return true;
 }
 
-int count_terms(std::vector<K> A)
+std::string MyClass::make_splice(std::string& S1, std::string& S2)
 {
-	int counter = 0;
-	for (size_t j = 0; j < A.size(); j++)
+	std::string result;
+	int count_difference = 0, index_difference;
+	for (size_t i = 0; i < N; i++)
 	{
-		if (A[j].is_active) counter++;
+		if (S1[i] == S2[i]) result.push_back(S1[i]);
+		else result.push_back('~');
 	}
-	return counter;
+	return result;
 }
 
-void print(std::vector<K> &result_implicants)
+bool MyClass::is_absorb(std::string implicant, std::string minterm)
 {
+	for (size_t i = 0; i < N; i++)
+	{
+		if (!((implicant[i] == minterm[i]) || implicant[i] == '~')) return false;
+	}
+	return true;
+}
+
+void MyClass::print_res(std::ofstream& fout, bool** matrix)
+{
+	std::vector<int> pass_i;
+	std::vector<int> pass_j;
+	int counter=0;
 	for (size_t i = 0; i < result_implicants.size(); i++)
 	{
-		for (int j=0; j< result_implicants[i].K_index.size(); j++)
+		for (size_t j = 0; j < start_minterms.size(); j++) 
 		{
-			if (result_implicants[i].K_index[j] == 1)
+			if (matrix[i][j]) counter++;
+		}
+		if (counter==0)
+		{
+			pass_i.push_back(i);
+		}
+		counter = 0;
+	}
+	for (size_t i = 0; i < start_minterms.size(); i++)
+	{
+		for (size_t j = 0; j < result_implicants.size(); j++)
+		{
+			if (matrix[j][i]) counter++;
+		}
+		if (counter == 0)
+		{
+			pass_j.push_back(i);
+		}
+		counter = 0;
+	}
+	
+	fout << '+';
+	for (auto i = 0; i < start_minterms.size() + 1 - pass_j.size(); i++)
+	{
+		for (size_t j = 0; j < N; j++)
+		{
+			fout << '-';
+		}
+		fout << '+';
+	}
+	fout << std::endl;
+	fout << '|';
+	for (auto j = 0; j < start_minterms.size() + 1; j++)
+	{
+		if (j == 0)
+		{
+			fout << std::setw(N) << ' ' << '|';
+		}
+		else if (std::find(pass_j.begin(), pass_j.end(), j-1) == pass_j.end())
+		{
+			fout << std::setw(N) << start_minterms[j - 1] << '|';
+		}
+	}
+	fout << std::endl;
+	fout << '+';
+	for (auto i = 0; i < start_minterms.size() + 1 - pass_j.size(); i++)
+	{
+		for (size_t j = 0; j < N; j++)
+		{
+			fout << '-';
+		}
+		fout << '+';
+	}
+	fout << std::endl;
+	int l = 0;
+	for (auto& el : result_implicants)
+	{
+		if (std::find(pass_i.begin(), pass_i.end(), l) != pass_i.end()) 
+		{
+			l++;
+			continue;
+		}
+		fout << '|';
+		fout << std::setw(N) << el << '|';
+		for (auto j = 0; j < start_minterms.size(); j++) {
+			if (std::find(pass_j.begin(), pass_j.end(), j) == pass_j.end())
 			{
-				if (result_implicants[i].K_bool[j] == '1') 
-					std::cout << 'X' << j + 1 << ' ';
-				else 
-					std::cout << "not" << 'X' << j + 1 << ' ';
+				if (matrix[l][j])
+				{
+					fout << std::setw(N) << '1' << '|';
+				}
+				else fout << std::setw(N) << ' ' << '|';
 			}
 		}
-		std::cout << std::endl;
+		fout << std::endl;
+		fout << '+';
+		for (auto i = 0; i < start_minterms.size() + 1 -pass_j.size() ; i++)
+		{
+			for (size_t j = 0; j < N; j++)
+			{
+				fout << '-';
+			}
+			fout << '+';
+		}
+		fout << std::endl;
+		l++;
 	}
 }
 
-void get_result(std::vector<std::vector<K>> &string_coefficients)
+void MyClass::alignment_marks(std::ofstream &fout_res)
 {
-
-	std::vector<K> result_implicants;
-	while (not_yet(string_coefficients))
+	bool** matrix = new bool* [result_implicants.size()];
+	
+	for (int i = 0; i < result_implicants.size(); i++) 
 	{
-		//сортируем строки по возрастанию длины
-		std::sort(string_coefficients.begin(), string_coefficients.end(), [](std::vector<K> A, std::vector<K> B)
-			{
-				return (count_terms(A) < count_terms(B));
-			}
-		);
+		matrix[i] = new bool[start_minterms.size()];
+	}
 
-		std::vector<std::pair<K, int>> implicant_and_rang;
-		// ищем минимальную степень набора
-		int min_deg = 10;
-		for (size_t i = 0; i < string_coefficients.size(); i++)
+	// расставляем пометки
+	int counter = 0;
+	for (auto& el : result_implicants)
+	{
+		for (size_t j = 0; j < start_minterms.size(); j++)
 		{
-			for (size_t j = 0; j < string_coefficients[i].size(); j++)
+			if (is_absorb(el, start_minterms[j]))
 			{
-				if (string_coefficients[i][j].is_active && string_coefficients[i][j].deg < min_deg)
-				{
-					min_deg = string_coefficients[i][j].deg;
-				}
+				matrix[counter][j] = true;
 			}
-			if (min_deg != 10) break;
+			else matrix[counter][j] = false;
 		}
-		// сохраняем наборы минимальной степени
-		bool is_check = false;
-		for (size_t i = 0; i < string_coefficients.size(); i++)
+		counter++;
+	}
+	std::vector<int> number_implicants;
+	int index_implicant;
+	for (size_t j = 0; j < start_minterms.size(); j++)
+	{
+		counter = 0;
+		for (size_t i = 0; i < result_implicants.size(); i++)
 		{
-			for (size_t j = 0; j < string_coefficients[i].size(); j++) 
+			if (matrix[i][j]) 
 			{
-				if (string_coefficients[i][j].is_active && string_coefficients[i][j].deg == min_deg)
-				{
-					implicant_and_rang.push_back(std::make_pair(string_coefficients[i][j], 1));
-					is_check = true;
-				}
-				if (string_coefficients[i][j].is_active)
-				{
-					string_coefficients[i][j].is_active = false;
-				}
-			}
-			if (is_check)
-			{
-				break;
+				counter++;
+				index_implicant = i;
 			}
 		}
-		// подсчитываем рейтинги наборов
-		for (size_t i = 0; i < string_coefficients.size(); i++)
+		if (counter == 1) 
 		{
-			for (size_t j = 0; j < string_coefficients[i].size(); j++) 
+			number_implicants.push_back(index_implicant);
+			for (size_t j = 0; j < start_minterms.size(); j++)
 			{
-				if (string_coefficients[i][j].is_active) 
+				if (matrix[index_implicant][j])
 				{
-					for (size_t i = 0; i < implicant_and_rang.size(); i++)
+					for (size_t i = 0; i < result_implicants.size(); i++) 
 					{
-						if (implicant_and_rang[i].first == string_coefficients[i][j])
-						{
-							implicant_and_rang[i].second++;
-						}
+						matrix[i][j] = false;
 					}
 				}
+				
 			}
 		}
-		//выбираем набор максимального ранга
-		int max_reit = 0;
-		int index_max_el;
-		for (size_t i = 0; i < implicant_and_rang.size(); i++)
-		{
-			if (implicant_and_rang[i].second > max_reit)
-			{
-				max_reit = implicant_and_rang[i].second;
-				index_max_el = i;
-			}
-		}
-		//удаляем из таблицы строки с набором макс ранга
-		result_implicants.push_back(implicant_and_rang[index_max_el].first);
-		for (size_t i = 0; i < string_coefficients.size(); i++)
-		{
-			for (size_t j = 0; j < string_coefficients[i].size(); j++) 
-			{
-				if (string_coefficients[i][j].is_active && string_coefficients[i][j] == implicant_and_rang[index_max_el].first)
-				{
-					for (size_t k = 0; k < string_coefficients[i].size(); k++)
-					{
-						string_coefficients[i][k].is_active = false;
-					}
-					j = string_coefficients[i].size();
-					break;
-				}
-			}
-		}
-
 	}
-	print(result_implicants);
-}
+	counter = 0;
 
-int main()
-{
-	std::ifstream fin("in.txt");
-	std::vector<std::vector<K>> string_coefficients;
-	std::vector<std::string> function_numbers;
-	std::vector<bool> function_value;
-	initialisation_function_numers(function_numbers);
-	initialisation_string_coefficients(string_coefficients, function_numbers);
-	// считывание ДНФ
-	std::unordered_set<std::string> is_true_in_DNF;
-	std::string str;
-	while (fin >> str) 
+	// вывод минимизированную 
+	print_res(fout_res, matrix);
+
+	// вывод импликант индексов импликант для мднф
+	fout_res << "MDNF members: ";
+	for (auto el : result_implicants)
 	{
-		is_true_in_DNF.insert(str);
+		for (size_t j = 0; j < number_implicants.size();j++)
+		{
+			if (number_implicants[j] == counter) 
+			{
+				fout_res << el << ' ';
+			}
+
+				
+		}
+			counter++;
 	}
-	// поиск нулевых коэффициентов и их удаление
-	find_delete_K(string_coefficients, function_numbers, is_true_in_DNF);
+	fout_res << std::endl;
 	
 
-	// минимизируем систему
-	get_result(string_coefficients);
+	for (int i = 0; i < result_implicants.size(); i++)
+	{
+		delete[] matrix[i];
+	}
+	delete[]matrix;
 }
+int main()
+{
+	//std::ifstream fin("DNF Lobusov.txt");
 
+	std::ifstream fin("DNF Lobusov IU8-65.txt");
+	std::ofstream fout("table.txt");
+	std::ofstream fout_res("result.txt");
+	int N;
+	std::vector<std::string> My_V;
+	fin >> N;
+	std::string minterm;
+	while (fin >> minterm)
+	{
+		My_V.push_back(minterm);
+	}
+	MyClass	obj(N, My_V);
+	obj.finding_implicant();
+	obj.print(fout);
+	obj.alignment_marks(fout_res);
+}
