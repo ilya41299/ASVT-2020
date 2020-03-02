@@ -24,10 +24,8 @@ private:
 	bool is_splice(std::string &S1, std::string &S2); // проверка возможности склейки
 	std::string make_splice(std::string &S1, std::string &S2); // склейка двух наборов
 	bool is_absorb(std::string S1, std::string S2); // проверка на возможностть склейки
-	void print_res(std::ofstream& fout, bool** matrix);
-	
+	void print_res(std::ofstream& fout, bool** matrix); // печать таблицы 
 };
-
 
 MyClass::MyClass(int n, std::vector<std::string> DNF)
 {
@@ -346,10 +344,8 @@ void MyClass::alignment_marks(std::ofstream &fout_res)
 		}
 	}
 	counter = 0;
-
 	// вывод минимизированную 
 	print_res(fout_res, matrix);
-
 	// вывод импликант индексов импликант для мднф
 	fout_res << "MDNF members: ";
 	for (auto el : result_implicants)
@@ -359,26 +355,30 @@ void MyClass::alignment_marks(std::ofstream &fout_res)
 			if (number_implicants[j] == counter) 
 			{
 				fout_res << el << ' ';
-			}
-
-				
+			}				
 		}
-			counter++;
+		counter++;
 	}
 	fout_res << std::endl;
-	
-
 	for (int i = 0; i < result_implicants.size(); i++)
 	{
 		delete[] matrix[i];
 	}
 	delete[]matrix;
 }
+
 int main()
 {
-	//std::ifstream fin("DNF Lobusov.txt");
-
-	std::ifstream fin("DNF Lobusov IU8-65.txt");
+	std::string input;
+	std::cout << "Name of the input file (***.txt): ";
+	std::cin >> input;
+	std::ifstream fin(input);
+	if (!fin.is_open())
+	{
+		std::cout << "invalid file name";
+		std::cin.get();
+		return 0;
+	}
 	std::ofstream fout("table.txt");
 	std::ofstream fout_res("result.txt");
 	int N;
@@ -393,4 +393,6 @@ int main()
 	obj.finding_implicant();
 	obj.print(fout);
 	obj.alignment_marks(fout_res);
+	std::cin.get();
+	return 0;
 }
