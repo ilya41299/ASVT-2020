@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <fstream>
 #include <iomanip>
+#include <direct.h>
+#include <filesystem>
 
 class MyClass
 {
@@ -13,7 +15,7 @@ public:
 	MyClass(int n, std::vector<std::string> DNF);
 	void finding_implicant(); // поиск имликант 
 	void print(std::ofstream &fout); // печать таблицы
-	void alignment_marks(std::ofstream &fout); // расстановка меток и их минимизация
+	void alignment_marks(std::ofstream& fout_matrix, std::ofstream& fout_impl, std::ofstream& res_impl); // расстановка меток и их минимизация
 private:
 	std::vector<std::string> start_minterms; // наборы ДНФ
 	std::set<std::string> result_implicants; // импликанты получаемые при склейке 
@@ -24,7 +26,7 @@ private:
 	bool is_splice(std::string &S1, std::string &S2); // проверка возможности склейки
 	std::string make_splice(std::string &S1, std::string &S2); // склейка двух наборов
 	bool is_absorb(std::string S1, std::string S2); // проверка на возможностть склейки
-	void print_res(std::ofstream& fout, bool** matrix); // печать таблицы 
+	void print_res(std::ofstream& fout_matrix, std::ofstream& fout_impl, bool** matrix); // печать таблицы 
 };
 
 MyClass::MyClass(int n, std::vector<std::string> DNF)
@@ -193,7 +195,7 @@ bool MyClass::is_absorb(std::string implicant, std::string minterm)
 	return true;
 }
 
-void MyClass::print_res(std::ofstream& fout, bool** matrix)
+void MyClass::print_res(std::ofstream& fout_matrix, std::ofstream& fout_impl, bool** matrix)
 {
 	std::vector<int> pass_i;
 	std::vector<int> pass_j;
@@ -222,40 +224,6 @@ void MyClass::print_res(std::ofstream& fout, bool** matrix)
 		}
 		counter = 0;
 	}
-	
-	fout << '+';
-	for (auto i = 0; i < start_minterms.size() + 1 - pass_j.size(); i++)
-	{
-		for (size_t j = 0; j < N; j++)
-		{
-			fout << '-';
-		}
-		fout << '+';
-	}
-	fout << std::endl;
-	fout << '|';
-	for (auto j = 0; j < start_minterms.size() + 1; j++)
-	{
-		if (j == 0)
-		{
-			fout << std::setw(N) << ' ' << '|';
-		}
-		else if (std::find(pass_j.begin(), pass_j.end(), j-1) == pass_j.end())
-		{
-			fout << std::setw(N) << start_minterms[j - 1] << '|';
-		}
-	}
-	fout << std::endl;
-	fout << '+';
-	for (auto i = 0; i < start_minterms.size() + 1 - pass_j.size(); i++)
-	{
-		for (size_t j = 0; j < N; j++)
-		{
-			fout << '-';
-		}
-		fout << '+';
-	}
-	fout << std::endl;
 	int l = 0;
 	for (auto& el : result_implicants)
 	{
@@ -264,34 +232,23 @@ void MyClass::print_res(std::ofstream& fout, bool** matrix)
 			l++;
 			continue;
 		}
-		fout << '|';
-		fout << std::setw(N) << el << '|';
+		fout_impl << el << std::endl;
 		for (auto j = 0; j < start_minterms.size(); j++) {
 			if (std::find(pass_j.begin(), pass_j.end(), j) == pass_j.end())
 			{
 				if (matrix[l][j])
 				{
-					fout << std::setw(N) << '1' << '|';
+					fout_matrix << 1;
 				}
-				else fout << std::setw(N) << ' ' << '|';
+				else fout_matrix << 0;
 			}
 		}
-		fout << std::endl;
-		fout << '+';
-		for (auto i = 0; i < start_minterms.size() + 1 -pass_j.size() ; i++)
-		{
-			for (size_t j = 0; j < N; j++)
-			{
-				fout << '-';
-			}
-			fout << '+';
-		}
-		fout << std::endl;
+		fout_matrix << std::endl;
 		l++;
 	}
 }
 
-void MyClass::alignment_marks(std::ofstream &fout_res)
+void MyClass::alignment_marks(std::ofstream& fout_matrix, std::ofstream& fout_impl, std::ofstream& res_impl)
 {
 	bool** matrix = new bool* [result_implicants.size()];
 	
@@ -344,22 +301,20 @@ void MyClass::alignment_marks(std::ofstream &fout_res)
 		}
 	}
 	counter = 0;
-	// вывод минимизированную 
-	print_res(fout_res, matrix);
+	// вывод минимизированной таблицы
+	print_res(fout_matrix, fout_impl, matrix);
 	// вывод импликант индексов импликант для мднф
-	fout_res << "MDNF members: ";
 	for (auto el : result_implicants)
 	{
 		for (size_t j = 0; j < number_implicants.size();j++)
 		{
 			if (number_implicants[j] == counter) 
 			{
-				fout_res << el << ' ';
+				res_impl << el << ' ';
 			}				
 		}
 		counter++;
 	}
-	fout_res << std::endl;
 	for (int i = 0; i < result_implicants.size(); i++)
 	{
 		delete[] matrix[i];
@@ -376,13 +331,15 @@ int main()
 	if (!fin.is_open())
 	{
 		std::cout << "invalid file name";
-		std::cin.get();
+		system("pause");
 		return 0;
 	}
 	std::ofstream fout("table.txt");
-	std::ofstream fout_res("result.txt");
+	std::ofstream fout_matrix("mat.txt");
+	std::ofstream fout_impl("impls.txt");
+	std::ofstream res_impl("res_impls.txt");
 	int N;
-	std::vector<std::string> My_V;
+	std::vector<std::string> My_V; // ДНФ
 	fin >> N;
 	std::string minterm;
 	while (fin >> minterm)
@@ -392,7 +349,16 @@ int main()
 	MyClass	obj(N, My_V);
 	obj.finding_implicant();
 	obj.print(fout);
-	obj.alignment_marks(fout_res);
-	std::cin.get();
+	obj.alignment_marks(fout_matrix, fout_impl, res_impl);
+	std::filesystem::path path = std::filesystem::current_path();
+	std::string scr = path.generic_string();
+	scr += "/script.py ";
+	std::string command = "python " + scr + path.generic_string() + "/mat.txt " + path.generic_string() + "/impls.txt";
+	std::system(command.c_str());
+	fout.close();
+	fout_matrix.close();
+	fout_impl.close();
+	res_impl.close();
+	system("pause");
 	return 0;
 }
