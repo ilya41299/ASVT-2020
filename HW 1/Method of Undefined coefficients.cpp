@@ -7,12 +7,13 @@
 #include <fstream>
 #include <algorithm>
 
+// структура представляющая коэффициенты таблицы
 struct K
 {
-	std::vector<int>  K_index;
-	std::string K_bool;
-	bool is_active;
-	int deg;
+	std::vector<int>  K_index; // индекс к-та
+	std::string K_bool; // бул индекл
+	bool is_active; // включение элемента 
+	int deg; // степень монома
 	K();
 	K(std::vector<int> index, std::string boolean)
 	{
@@ -39,7 +40,7 @@ struct K
 		return true;;
 	}
 };
-
+// инициализация вектора с лексикографически у-ми наборами
 void initialisation_function_numers(std::vector<std::string>& function_numers)
 {
 	for (size_t i = 0; i < 64; i++)
@@ -54,7 +55,7 @@ void initialisation_function_numers(std::vector<std::string>& function_numers)
 		function_numers.push_back(number);
 	}
 }
-
+// инициализация вектора коэффициентов системы
 void initialisation_string_coefficients(std::vector<std::vector<K>>& string_coefficients, std::vector<std::string>& function_numers)
 {
 	for (int counter = 0; counter < 64; counter++)
@@ -92,7 +93,7 @@ void initialisation_string_coefficients(std::vector<std::vector<K>>& string_coef
 		string_coefficients.push_back(V_K);
 	}
 }
-
+// ф-я удаления нулевых коэффициентов из системы
 void find_delete_K(std::vector<std::vector<K>>& string_coefficients, std::vector<std::string>& function_numbers, std::unordered_set<std::string>& is_true_in_DNF)
 {
 	std::vector<K> zeros_K;
@@ -108,7 +109,6 @@ void find_delete_K(std::vector<std::vector<K>>& string_coefficients, std::vector
 			}
 		}
 	}
-
 	// удаляем коэффициенты
 	for (size_t i = 0; i < string_coefficients.size(); i++)
 	{
@@ -122,8 +122,7 @@ void find_delete_K(std::vector<std::vector<K>>& string_coefficients, std::vector
 		}
 	}
 }
-
-// проверка, есть ли еще непокрытые уравнения
+// проверка, есть ли еще уравнения с непокрытыми коэф-ми
 bool not_yet(std::vector<std::vector<K>>& string_coefficients)
 {
 	for (size_t i = 0; i < string_coefficients.size(); i++)
@@ -135,7 +134,7 @@ bool not_yet(std::vector<std::vector<K>>& string_coefficients)
 	}
 	return false;
 }
-
+// функция подсчета числа коэффициентов в системе
 int count_terms(std::vector<K> A)
 {
 	int counter = 0;
@@ -145,7 +144,7 @@ int count_terms(std::vector<K> A)
 	}
 	return counter;
 }
-
+// вывод полученного решения в файл
 void print(std::vector<K>& result_implicants, std::ofstream &fout)
 {
 	for (size_t i = 0; i < result_implicants.size(); i++)
@@ -163,7 +162,7 @@ void print(std::vector<K>& result_implicants, std::ofstream &fout)
 		fout << std::endl;
 	}
 }
-
+// поиск минимальной степени мономов уравнения
 int find_deg(std::vector<K>& A)
 {
 	int min_deg = 10;
@@ -176,10 +175,9 @@ int find_deg(std::vector<K>& A)
 	}
 	return min_deg;
 }
-
+// основная функция с алгоритмом
 void get_result(std::vector<std::vector<K>>& string_coefficients , std::ofstream &fout)
 {
-
 	std::vector<K> result_implicants;
 	while (not_yet(string_coefficients))
 	{
@@ -315,6 +313,8 @@ int main()
 	find_delete_K(string_coefficients, function_numbers, is_true_in_DNF);
 	// минимизируем систему
 	get_result(string_coefficients, fout);
-	std::cin.get();
+	fout.close();
+	system("pause");
 	return 0;
 }
+
